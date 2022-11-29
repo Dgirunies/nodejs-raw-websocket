@@ -1,0 +1,8 @@
+{
+  "name": "nodejs-raw-websocket",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:Dgirunies/nodejs-raw-websocket.git",
+  "author": "Edneth Girão",
+  "license": "MIT"
+}
