@@ -1,11 +1,19 @@
 import { createServer } from 'http'
 const PORT = 1337
 
-createServer((request, response) => {
+const server = createServer((request, response) => {
     response.writeHead(200)
     response.end("Server is alive")
 })
 .listen(PORT, () => console.log("Server listening to", PORT))
+
+server.on('upgrade', (req, socket, head) => {
+    console.log(
+        req,
+        socket,
+        head
+    )
+})
 
 // error handling to keep the server on
 ;
