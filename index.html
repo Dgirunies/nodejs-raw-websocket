@@ -15,18 +15,48 @@
             console.log('WebSocket is connected')
             const id = Math.round(Math.random() * 100)
             console.log('Sending...', id)
-            const data = JSON.stringify({
-                id,
-                name: `[${id}] Edneth Girão`,
-                address: {
-                    street: 'Your street',
-                    number: 20 * id
-                },
-                profession: 'Developer'
-            })
-            socket.send(data)
+            const intervalId = setInterval(() => {
+                const data = JSON.stringify([
+                    {
+                        id,
+                        name: `[${id}] Edneth Girão`,
+                        address: {
+                            street: 'Your street',
+                            number: 20 * id
+                        },
+                        profession: 'Developer'
+                    },
+                    {
+                        id,
+                        name: `[${id}] Brother Girão`,
+                        address: {
+                            street: 'Your street',
+                            number: 20 * id
+                        },
+                        profession: 'Developer'
+                    },
+                    {
+                        id,
+                        name: `[${id}] Sister Girão`,
+                        address: {
+                            street: 'Your street',
+                            number: 20 * id
+                        },
+                        profession: 'Developer'
+                    },
+                ])
+                socket.send(data)
+            }, 1000)
+
+            setTimeout(() => {
+                clearInterval(intervalId)
+            }, 5000)
         }
-        socket.onmessage = (msg) => console.log('New message received', msg)
+        socket.onmessage = (msg) => {
+            const message = msg.data
+            console.log('You got a message', message)
+            messages.innerHTML = `</br> ${message}`
+        }
         socket.onerror = (error) => console.error('Web Socket error', error)
         socket.onclose = (event) => console.log('Disconnected from Websocket server')
     </script>
