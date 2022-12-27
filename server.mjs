@@ -9,6 +9,15 @@ const PORT = 1337
 // Default socket key provided by websocket documentation
 const WEBSOCKET_MAGIC_STRING_KEY = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
+const SEVEN_BITS_INTEGER_MARKER = 125
+const SIXTEEN_BITS_INTEGER_MARKER = 126
+const SIXTYFOUR_BITS_INTEGER_MARKER = 127
+
+const MASK_KEY_BYTES_LENGTH = 4
+
+// parseInt('10000000', 2)
+const FIRST_BIT = 128
+
 const server = createServer((request, response) => {
     response.writeHead(200)
     response.end("Server is alive")
@@ -36,6 +45,74 @@ function prepareHandShakeHeaders(id) {
     return headers
 }
 
+function unmask(encodedBuffer, maskKey) {
+
+    const finalBuffer = Buffer.from(encodedBuffer)
+    //  Because the maskKey has only 4 bytes
+    // index % 4 === 0, 1, 2, , 3 = index bits needed to decode the message
+
+    // XOR ^ 
+    // returns 1 if both are different
+    // returns 0 if both are equal
+
+    // (71).toString(2).padStart(8, "0") = 0 1 0 0 0 1 1 1
+    // (53).toString(2).padStart(8, "0") = 0 0 1 1 0 1 0 1
+    //                                     0 1 1 1 0 0 1 0
+
+    // (71 ^ 53).toString(2).padStart(9, "0") = '01110010'
+    // String.fromCharCode(parseInt('01110010', 2)) => 'r'
+
+    const fillWithEightZeros = (t) => t.padStart(8, '0')
+    const toBinary = (t) => fillWithEightZeros(t.toString(2))
+    const fromBinaryToDecimal = (t) => parseInt(toBinary(t), 2)
+    const getCharFromBinary = (t) => String.fromCharCode(fromBinaryToDecimal(t))
+
+    for (let index = 0; index <= encodedBuffer.length; index++) {
+        finalBuffer[index] = encodedBuffer[index] ^ maskKey[index % MASK_KEY_BYTES_LENGTH]
+
+        const logger = {
+            unmaskingCalc: encodedBuffer[index]
+                ? `${toBinary(encodedBuffer[index])} ^ ${toBinary(maskKey[index % MASK_KEY_BYTES_LENGTH])} = ${toBinary(finalBuffer[index])}`
+                : '',
+            decoded: encodedBuffer[index]
+                ? getCharFromBinary(finalBuffer[index])
+                : ''
+        }
+        console.log(logger)
+    }
+
+    return finalBuffer
+}
+
+// Function to be executed when the socket is readable
+function onSocketReadable(socket) {
+    // Consume optcode (first byte)
+    // 1 - 1 byte = 8bits
+    socket.read(1)
+
+    const [markerAndPayloadLength] = socket.read(1)
+    // Because the first bit is always 1 for client-to-server messages
+    // you can subtract one bit (128 or '10000000')
+    // from this byte to get rid of the MASK bit
+    const lengthIndicatorInBits = markerAndPayloadLength - FIRST_BIT
+
+    let messageLength = 0
+
+    if (lengthIndicatorInBits <= SEVEN_BITS_INTEGER_MARKER) {
+        messageLength = lengthIndicatorInBits
+    } else {
+        throw new Error('Your message is to long, we do not handle 64-bit messages')
+    }
+    
+    const maskKey = socket.read(MASK_KEY_BYTES_LENGTH)
+    const encoded = socket.read(messageLength)
+    const decoded = unmask(encoded, maskKey)
+    const received = decoded.toString('utf-8')
+    const data  = JSON.parse(received)
+    console.log('Message received => ', data)
+}
+
+
 // Handling the socket upgrade
 function onSocketUpgrade(req, socket, head) {
     // Get the current client key
@@ -43,6 +120,7 @@ function onSocketUpgrade(req, socket, head) {
     console.log(`${webClientSocketKey} connected!`)
     const headers = prepareHandShakeHeaders(webClientSocketKey)
     socket.write(headers)
+    socket.on('readable', () => onSocketReadable(socket))
 }
 
 // When server request a connection upgrade as it is configured to list to a socket on the front end
